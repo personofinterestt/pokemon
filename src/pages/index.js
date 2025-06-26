@@ -1,110 +1,223 @@
-import Image from "next/image"; // Bu import kullanmıyorsanız kaldırabilirsiniz
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
-import { Geist, Geist_Mono } from "next/font/google";
-import { Provider } from 'react-redux';
-import { store } from '../app/store';
-import { getPokemons } from './api/apiDocs';
+import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/router'
+import FilmCard from '../components/FilmCard'
+import { Swiper, SwiperSlide } from 'swiper/react'
+import { Navigation } from 'swiper/modules'
+import 'swiper/css'
+import 'swiper/css/navigation'
 
-
-// Font tanımlamaları
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const sliderConfig = (prevRef, nextRef) => ({
+  modules: [Navigation],
+  navigation: {
+    prevEl: prevRef?.current,
+    nextEl: nextRef?.current,
+  },
+  spaceBetween: 6,
+  slidesPerView: 1.2,
+  breakpoints: {
+    640: { slidesPerView: 2.2, spaceBetween: 8 },
+    1024: { slidesPerView: 3.2, spaceBetween: 8 },
+    1280: { slidesPerView: 4.2, spaceBetween: 6 },
+    1536: { slidesPerView: 5.2, spaceBetween: 6 },
+  },
+  className: '!pb-8',
+})
 
 export default function Home() {
-  const router = useRouter();
-  // router.query.page bu kodu kullanmıyorsanız bu satırı kaldırabilirsiniz.
-  // const page = parseInt(router.query.page) || 1;
-
-  // Orijinal pokemon listesini saklamak için state
-  const [allPokemons, setAllPokemons] = useState([]);
-  // Ekranda gösterilecek (filtrelenmiş veya filtrelenmemiş) pokemonlar için state
-  const [displayedPokemons, setDisplayedPokemons] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); // Hata yönetimi için state
-  const [search, setSearch] = useState("");
-
-
+  const router = useRouter()
+  const { genre, search } = router.query
+  const [hero, setHero] = useState(null)
+  const [trending, setTrending] = useState([])
+  const [nowPlaying, setNowPlaying] = useState([])
+  const [upcoming, setUpcoming] = useState([])
+  const [topRated, setTopRated] = useState([])
+  const [filtered, setFiltered] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    getPokemons({limit: 160}).then(data => {
-      setDisplayedPokemons(data.results);
-      setAllPokemons(data.results);
-      setLoading(false);
-    });
-  },[]);
-  // Arama input'u değiştiğinde çalışacak useEffect
-  useEffect(() => {
-    if (search) {
-      // Orijinal listeden (allPokemons) filtrele
-      const filtered = allPokemons.filter(pokemon =>
-        pokemon.name.toLowerCase().includes(search.toLowerCase()) // Küçük harfe çevirerek karşılaştır
-      );
-      setDisplayedPokemons(filtered); // Filtrelenmiş listeyi ekrana göster
-    } else {
-      // Arama alanı boş olduğunda orijinal listeyi göster
-      setDisplayedPokemons(allPokemons);
+    const fetchAll = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        // Arama öncelikli
+        if (search) {
+          const res = await fetch(`https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(search)}&language=tr`, {
+            headers: {
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+          })
+          const data = await res.json()
+          setFiltered(data.results || [])
+          setHero(data.results?.[0] || null)
+          setTrending([])
+          setNowPlaying([])
+          setUpcoming([])
+          setTopRated([])
+        } else if (genre) {
+          const res = await fetch(`https://api.themoviedb.org/3/discover/movie?with_genres=${genre}&language=tr`, {
+            headers: {
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+          })
+          const data = await res.json()
+          setFiltered(data.results || [])
+          setHero(data.results?.[0] || null)
+          setTrending([])
+          setNowPlaying([])
+          setUpcoming([])
+          setTopRated([])
+        } else {
+          const [trendRes, nowRes, upRes, topRes] = await Promise.all([
+            fetch('https://api.themoviedb.org/3/trending/movie/week?language=tr', {
+              headers: {
+                Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+            }),
+            fetch('https://api.themoviedb.org/3/movie/now_playing?language=tr', {
+              headers: {
+                Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+            }),
+            fetch('https://api.themoviedb.org/3/movie/upcoming?language=tr', {
+              headers: {
+                Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+            }),
+            fetch('https://api.themoviedb.org/3/movie/top_rated?language=tr', {
+              headers: {
+                Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+            }),
+          ])
+          const [trend, now, up, top] = await Promise.all([
+            trendRes.json(),
+            nowRes.json(),
+            upRes.json(),
+            topRes.json(),
+          ])
+          setTrending(trend.results || [])
+          setNowPlaying(now.results || [])
+          setUpcoming(up.results || [])
+          setTopRated(top.results || [])
+          setHero(trend.results?.[0] || null)
+          setFiltered([])
+        }
+      } catch (err) {
+        setError('API error')
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [search, allPokemons]); // search ve allPokemons değiştiğinde tetiklensin
+    fetchAll()
+  }, [genre, search])
 
-  return (
-    // Eğer Redux'u sadece burada kullanmıyorsanız, Provider'ı _app.js veya layout dosyanızda kullanmak daha iyidir.
-    // <Provider store={store}>
-      <div
-        className={`min-h-screen bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-700 p-4 sm:p-6 ${geistSans.variable} font-sans`}
-      >
-    <div className="flex flex-col sm:flex-row justify-center items-center mb-6 px-4"> {/* Container'a padding ekledik */}
-  <input
-    type="text"
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-    placeholder="Pokemon Ara..."
-    className="w-full max-w-md p-3 rounded-lg border-2 border-yellow-300 text-center text-white placeholder-yellow-200 bg-transparent focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
-  />
-</div>
+  if (loading) return <div className="py-24 text-center text-lg text-neutral-300">Yükleniyor...</div>
+  if (error) return <div className="py-24 text-center text-lg text-red-400">Hata: {error}</div>
 
-        {loading && <p className="text-center text-white">Yükleniyor...</p>}
-        {error && <p className="text-center text-red-500">{error}</p>}
-
-        {!loading && !error && displayedPokemons.length === 0 && search && (
-            <p className="text-center text-white">Aradığınız isimde Pokemon bulunamadı.</p>
-        )}
-         {!loading && !error && displayedPokemons.length === 0 && !search && (
-            <p className="text-center text-white">Gösterilecek Pokemon bulunamadı.</p>
-        )}
-
-<div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3"> {/* Daha fazla sütun ve daha dar aralık */}
-  {!loading && !error && displayedPokemons.map((pokemon) => (
-    // Ana kart container: Sade görünüm, toprak rengi, keskin kenarlar, küçük padding
-    <div
-      key={pokemon.name}
-      className="bg-yellow-100 border-2 border-yellow-300 shadow-md flex flex-col items-center p-2 rounded-sm"
-    >
-      <img
-        className="w-full h-32 object-contain mb-2 rounded-sm" // Resim boyutu küçültüldü, kenarlar keskinleştirildi
-        src={pokemon.sprites?.other?.['official-artwork']?.front_default || `https://img.pokemondb.net/artwork/${pokemon.name}.jpg`}
-        alt={`Resim ${pokemon.name}`}
-      />
-      <div className="text-center w-full px-1"> {/* Metin için biraz yatay padding */}
-        <Link href={`/pokemon/${pokemon.name}`}>
-          {/* Metin stili: Küçük font, bold, gri renk, isim kısaltılabilir */}
-          <div className="text-sm font-bold text-gray-800 cursor-pointer truncate hover:text-blue-700 transition duration-200">
-            {pokemon.name.charAt(0).toUpperCase() + pokemon.name.slice(1)}
+  // Eğer arama veya kategori varsa tek bir slider ile göster
+  if (search || genre) {
+    return (
+      <div className="pb-16">
+        {hero && (
+          <div className="relative w-full h-[340px] sm:h-[420px] md:h-[520px] rounded-2xl overflow-hidden mb-10 flex items-end shadow-2xl" style={{ background: hero.backdrop_path ? `url(https://image.tmdb.org/t/p/original${hero.backdrop_path}) center/cover` : '#222' }}>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent z-0" />
+            <div className="relative z-10 p-6 sm:p-12 max-w-2xl">
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-yellow-400 mb-2 drop-shadow-lg">{hero.title}</h1>
+              <p className="text-neutral-200 text-base sm:text-lg mb-4 line-clamp-3 drop-shadow">{hero.overview}</p>
+              <a href={`/movie/${hero.id}`} className="inline-block bg-yellow-400 text-neutral-900 font-bold px-6 py-3 rounded-lg shadow hover:bg-yellow-300 transition text-lg">Detaya Git</a>
+            </div>
           </div>
-        </Link>
+        )}
+        <div className="max-w-7xl mx-auto px-2 sm:px-6">
+          <SectionSlider title={search ? `"${search}" için Sonuçlar` : 'Kategori Filmleri'} movies={filtered} />
+        </div>
+      </div>
+    )
+  }
+
+  // Ana sayfa (default)
+  return (
+    <div className="pb-16">
+      {hero && (
+          <div className="relative w-full h-[340px] sm:h-[420px] md:h-[520px] rounded-2xl overflow-hidden mb-10 flex items-end shadow-2xl" style={{ background: hero.backdrop_path ? `url(https://image.tmdb.org/t/p/original${hero.backdrop_path}) center/cover` : '#222' }}>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent z-0" />
+            <div className="relative z-10 p-6 sm:p-12 max-w-2xl">
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-yellow-400 mb-2 drop-shadow-lg">{hero.title}</h1>
+              <p className="text-neutral-200 text-base sm:text-lg mb-4 line-clamp-3 drop-shadow">{hero.overview}</p>
+              <a href={`/movie/${hero.id}`} className="inline-block bg-yellow-400 text-neutral-900 font-bold px-6 py-3 rounded-lg shadow hover:bg-yellow-300 transition text-lg">Detaya Git</a>
+            </div>
+          </div>
+        )}
+      <div className="max-w-7xl mx-auto px-2 sm:px-6">
+        {/* HERO/BANNER */}
+        
+        {/* TRENDING */}
+        <SectionSlider title="Trend Olanlar" movies={trending} />
+        {/* NOW PLAYING */}
+        <SectionSlider title="Şimdi Vizyonda" movies={nowPlaying} />
+        {/* UPCOMING */}
+        <SectionSlider title="Yakında" movies={upcoming} />
+        {/* TOP RATED */}
+        <SectionSlider title="En Çok Oy Alanlar" movies={topRated} />
       </div>
     </div>
-  ))}
-</div>
+  )
+}
+
+function SectionSlider({ title, movies }) {
+  const prevRef = useRef(null)
+  const nextRef = useRef(null)
+  const [navigationReady, setNavigationReady] = useState(false)
+  useEffect(() => {
+    setNavigationReady(true)
+  }, [])
+  if (!movies?.length) return null
+  return (
+    <div className="mb-10 relative">
+      <h2 className="text-xl sm:text-2xl font-bold text-yellow-400 mb-4 px-2 sm:px-0">{title}</h2>
+      <div className="relative">
+        {navigationReady && (
+          <Swiper
+            {...sliderConfig(prevRef, nextRef)}
+            onInit={(swiper) => {
+              swiper.params.navigation.prevEl = prevRef.current
+              swiper.params.navigation.nextEl = nextRef.current
+              swiper.navigation.init()
+              swiper.navigation.update()
+            }}
+          >
+            {movies.map((movie) => (
+              <SwiperSlide key={movie.id}>
+                <FilmCard movie={movie} />
+              </SwiperSlide>
+            ))}
+          </Swiper>
+        )}
+        {/* Custom navigation buttons */}
+        <button
+          ref={prevRef}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-yellow-400 hover:bg-yellow-500 text-neutral-900 shadow-lg rounded-full w-12 h-12 flex items-center justify-center transition border-4 border-neutral-900"
+          style={{ boxShadow: '0 2px 16px 0 #0008', cursor: 'pointer' }}
+          aria-label="Önceki"
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+        </button>
+        <button
+          ref={nextRef}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-yellow-400 hover:bg-yellow-500 text-neutral-900 shadow-lg rounded-full w-12 h-12 flex items-center justify-center transition border-4 border-neutral-900"
+          style={{ boxShadow: '0 2px 16px 0 #0008', cursor: 'pointer' }}
+          aria-label="Sonraki"
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+        </button>
       </div>
-    // </Provider>
-  );
+    </div>
+  )
 }
