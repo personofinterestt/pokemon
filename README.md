@@ -1,4 +1,24 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# Movie App (TMDB Entegrasyonlu)
+
+Bu proje, [The Movie Database (TMDB)](https://www.themoviedb.org/) API'si ile popüler filmleri listeler ve detaylarını gösterir.
+
+## Kurulum
+
+1. TMDB hesabı açın ve API Access Token alın: https://www.themoviedb.org/settings/api
+2. Proje kök dizinine `.env.local` dosyası oluşturun ve aşağıdaki satırı ekleyin:
+
+```
+NEXT_PUBLIC_TMDB_ACCESS_TOKEN=BURAYA_TOKENINIZI_YAZIN
+```
+
+3. Projeyi başlatın:
+
+```
+npm install
+npm run dev
+```
+
+Ana sayfada popüler filmler listelenir. Bir filme tıklayarak detay sayfasına ulaşabilirsiniz.
 
 ## Getting Started
 
